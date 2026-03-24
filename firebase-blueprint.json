@@ -1,0 +1,39 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string", "description": "Display name of the user" },
+        "email": { "type": "string", "format": "email", "description": "User email address" },
+        "role": { "type": "string", "enum": ["user", "admin"], "description": "User role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp" }
+      },
+      "required": ["username", "email", "role", "createdAt"]
+    },
+    "GameRecord": {
+      "title": "GameRecord",
+      "description": "A single game session record",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the user who played" },
+        "username": { "type": "string", "description": "Username at the time of play" },
+        "score": { "type": "integer", "description": "Number of correct answers" },
+        "total": { "type": "integer", "description": "Total number of questions" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the game was played" }
+      },
+      "required": ["userId", "username", "score", "total", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/history/{recordId}": {
+      "schema": "GameRecord",
+      "description": "Global game history for leaderboard and stats"
+    }
+  }
+}

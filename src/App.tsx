@@ -1,9 +1,65 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered } from 'lucide-react';
+import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X } from 'lucide-react';
 import { LOGIC_QUESTIONS, PROVERB_QUESTIONS } from './questions';
 import { initAudio, toggleMute, getIsMuted, playCorrect, playIncorrect, playTimeout, playClick, playGameOver } from './audio';
-import { getAuthUser, login, register, logout, saveRecord, getLeaderboard, getStats } from './storage';
+import { auth, loginWithGoogle, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile } from './firebase';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+
+// Error Boundary Component
+interface ErrorBoundaryProps {
+  children: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: any;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let errorMessage = "Đã có lỗi xảy ra. Vui lòng thử lại sau.";
+      try {
+        const parsed = JSON.parse(this.state.error.message);
+        if (parsed.error) errorMessage = `Lỗi hệ thống: ${parsed.error}`;
+      } catch (e) {
+        // Not a JSON error
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 text-center">
+          <div className="bg-slate-900 border border-red-500/30 p-8 rounded-3xl max-w-md shadow-2xl">
+            <AlertCircle size={48} className="text-red-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-2">Rất tiếc!</h2>
+            <p className="text-slate-400 mb-6">{errorMessage}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold transition-all"
+            >
+              Tải lại trang
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 type QuestionType = 'math' | 'logic' | 'proverb';
 
@@ -78,6 +134,14 @@ type GameState = 'home' | 'playing' | 'gameover' | 'auth' | 'leaderboard' | 'sta
 const TIME_PER_QUESTION = 15;
 
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <GameContent />
+    </ErrorBoundary>
+  );
+}
+
+function GameContent() {
   const [gameState, setGameState] = useState<GameState>('home');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -88,45 +152,71 @@ export default function App() {
   const [isMuted, setIsMuted] = useState(getIsMuted());
   
   // Auth state
-  const [currentUser, setCurrentUser] = useState<string | null>(getAuthUser());
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [authError, setAuthError] = useState('');
+  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [newName, setNewName] = useState('');
 
   // Leaderboard & Stats state
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (currentUser) {
+      const unsubscribe = subscribeToUserProfile(currentUser.uid, (profile) => {
+        setUserProfile(profile);
+        setNewName(profile.username);
+      });
+      return () => unsubscribe();
+    } else {
+      setUserProfile(null);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
     if (gameState === 'leaderboard') {
-      setLeaderboard(getLeaderboard());
+      const unsubscribe = subscribeToLeaderboard(setLeaderboard);
+      return () => unsubscribe();
     } else if (gameState === 'stats' && currentUser) {
-      setStats(getStats(currentUser));
+      const unsubscribe = subscribeToUserStats(currentUser.uid, setStats);
+      return () => unsubscribe();
     }
   }, [gameState, currentUser]);
 
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-    
-    const result = authMode === 'login' 
-      ? login(username, password)
-      : register(username, password);
-      
-    if (result.success) {
-      setCurrentUser(username);
+  const handleLogin = async () => {
+    try {
+      await loginWithGoogle();
       setGameState('home');
-      setUsername('');
-      setPassword('');
-    } else {
-      setAuthError(result.message || 'Có lỗi xảy ra');
+    } catch (error) {
+      console.error('Login failed', error);
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logoutUser();
     setCurrentUser(null);
+    setUserProfile(null);
+    setGameState('home');
+  };
+
+  const handleUpdateName = async () => {
+    if (currentUser && newName.trim() && newName.length <= 20) {
+      try {
+        await updateUsername(currentUser.uid, newName.trim());
+        setIsEditingName(false);
+      } catch (error) {
+        console.error('Update name failed', error);
+      }
+    }
   };
 
   const handleToggleMute = () => {
@@ -154,11 +244,11 @@ export default function App() {
     } else {
       playGameOver();
       if (currentUser) {
-        saveRecord(currentUser, score, questions.length);
+        saveGameRecord(currentUser.uid, userProfile?.username || currentUser.displayName || 'Người chơi', score, questions.length);
       }
       setGameState('gameover');
     }
-  }, [currentIndex, questions.length, currentUser, score]);
+  }, [currentIndex, questions.length, currentUser, score, userProfile]);
 
   const handleTimeOut = useCallback(() => {
     setFeedback('timeout');
@@ -225,21 +315,47 @@ export default function App() {
       {/* Top Navigation */}
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-50">
         <div className="flex gap-2">
-          {currentUser ? (
+          {isAuthReady && currentUser ? (
             <div className="flex items-center gap-2 bg-slate-800/80 backdrop-blur-md border border-slate-700 px-4 py-2 rounded-full shadow-lg">
               <User size={18} className="text-indigo-400" />
-              <span className="text-sm font-semibold text-slate-300">{currentUser}</span>
+              {isEditingName ? (
+                <div className="flex items-center gap-1">
+                  <input 
+                    type="text" 
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-white focus:outline-none w-24"
+                    maxLength={20}
+                    autoFocus
+                  />
+                  <button onClick={handleUpdateName} className="text-green-400 hover:text-green-300">
+                    <Check size={14} />
+                  </button>
+                  <button onClick={() => { setIsEditingName(false); setNewName(userProfile?.username || ''); }} className="text-red-400 hover:text-red-300">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="text-sm font-semibold text-slate-300">{userProfile?.username || currentUser.displayName}</span>
+                  <button onClick={() => setIsEditingName(true)} className="text-slate-500 hover:text-indigo-400 transition-colors">
+                    <Edit2 size={14} />
+                  </button>
+                </>
+              )}
               <button onClick={handleLogout} className="ml-2 text-slate-500 hover:text-red-400 transition-colors">
                 <LogOut size={16} />
               </button>
             </div>
-          ) : (
+          ) : isAuthReady ? (
             <button 
-              onClick={() => setGameState('auth')}
+              onClick={handleLogin}
               className="flex items-center gap-2 bg-indigo-600/80 hover:bg-indigo-500 backdrop-blur-md border border-indigo-500/50 px-4 py-2 rounded-full shadow-lg text-sm font-semibold transition-colors"
             >
-              <User size={18} /> Đăng nhập
+              <User size={18} /> Đăng nhập Google
             </button>
+          ) : (
+            <div className="w-32 h-10 bg-slate-800/50 animate-pulse rounded-full"></div>
           )}
           
           {gameState !== 'home' && (
@@ -462,76 +578,6 @@ export default function App() {
           </motion.div>
         )}
 
-        {gameState === 'auth' && (
-          <motion.div
-            key="auth"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-md"
-          >
-            <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden p-8 border border-slate-700/50">
-              <div className="text-center mb-8">
-                <div className="w-16 h-16 bg-indigo-500/20 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-500/30">
-                  <User size={32} />
-                </div>
-                <h2 className="text-2xl font-bold text-white">
-                  {authMode === 'login' ? 'Đăng nhập' : 'Đăng ký tài khoản'}
-                </h2>
-              </div>
-
-              <form onSubmit={handleAuth} className="space-y-4">
-                {authError && (
-                  <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-3 rounded-lg text-sm text-center">
-                    {authError}
-                  </div>
-                )}
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Tên đăng nhập</label>
-                  <input 
-                    type="text" 
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                    placeholder="Nhập tên đăng nhập"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Mật khẩu</label>
-                  <input 
-                    type="password" 
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-                    placeholder="Nhập mật khẩu"
-                    required
-                  />
-                </div>
-
-                <button type="submit" className="w-full py-3 mt-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)]">
-                  {authMode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
-                </button>
-              </form>
-
-              <div className="mt-6 text-center text-sm text-slate-400">
-                {authMode === 'login' ? 'Chưa có tài khoản? ' : 'Đã có tài khoản? '}
-                <button 
-                  onClick={() => {
-                    setAuthMode(authMode === 'login' ? 'register' : 'login');
-                    setAuthError('');
-                  }}
-                  className="text-indigo-400 hover:text-indigo-300 font-semibold"
-                >
-                  {authMode === 'login' ? 'Đăng ký ngay' : 'Đăng nhập'}
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {gameState === 'leaderboard' && (
           <motion.div
             key="leaderboard"
@@ -553,9 +599,9 @@ export default function App() {
                   Chưa có dữ liệu. Hãy là người đầu tiên chơi!
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                   {leaderboard.map((user, index) => (
-                    <div key={user.username} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                    <div key={user.id} className="flex items-center justify-between p-4 bg-slate-800/50 rounded-xl border border-slate-700/50">
                       <div className="flex items-center gap-4">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
                           ${index === 0 ? 'bg-yellow-500 text-yellow-950' : 
@@ -591,7 +637,7 @@ export default function App() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-white">Thống kê</h2>
-                  <p className="text-sm text-slate-400">Tài khoản: <span className="text-indigo-400 font-semibold">{currentUser}</span></p>
+                  <p className="text-sm text-slate-400">Tài khoản: <span className="text-indigo-400 font-semibold">{currentUser?.displayName}</span></p>
                 </div>
               </div>
 
