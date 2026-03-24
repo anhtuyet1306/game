@@ -69,6 +69,7 @@ type Question = {
   text: string;
   options: string[];
   answer: string;
+  explanation?: string;
 };
 
 const shuffleArray = <T,>(array: T[]): T[] => {
@@ -479,12 +480,12 @@ function GameContent() {
           >
             <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden p-6 md:p-8 border border-slate-700/50">
               {/* Header */}
-              <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-full shadow-inner">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-full shadow-inner w-full sm:w-auto justify-center">
                   {getTypeIcon(currentQ.type)}
                   <span className="text-sm font-bold text-slate-300 uppercase tracking-wider">{getTypeName(currentQ.type)}</span>
                 </div>
-                <div className="text-indigo-300 font-bold bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-full">
+                <div className="text-indigo-300 font-bold bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-full w-full sm:w-auto text-center">
                   Câu {currentIndex + 1}/{questions.length}
                 </div>
               </div>
@@ -544,21 +545,36 @@ function GameContent() {
               </div>
               
               {/* Feedback Area */}
-              <div className="h-16 flex items-center justify-center mt-6">
+              <div className="min-h-[80px] flex flex-col items-center justify-center mt-6">
                 <AnimatePresence mode="wait">
                   {feedback === 'correct' && (
-                    <motion.div key="correct" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2 text-green-400 font-bold text-2xl bg-green-500/10 border border-green-500/20 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(34,197,94,0.2)]">
-                      <CheckCircle2 size={28} /> Chính xác!
+                    <motion.div key="correct" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 text-green-400 font-bold text-2xl bg-green-500/10 border border-green-500/20 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(34,197,94,0.2)]">
+                        <CheckCircle2 size={28} /> Chính xác!
+                      </div>
+                      {currentQ.explanation && (
+                        <p className="text-slate-400 text-sm mt-2 text-center italic px-4">{currentQ.explanation}</p>
+                      )}
                     </motion.div>
                   )}
                   {feedback === 'incorrect' && (
-                    <motion.div key="incorrect" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2 text-red-400 font-bold text-2xl bg-red-500/10 border border-red-500/20 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-                      <XCircle size={28} /> Sai rồi!
+                    <motion.div key="incorrect" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 text-red-400 font-bold text-2xl bg-red-500/10 border border-red-500/20 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                        <XCircle size={28} /> Sai rồi!
+                      </div>
+                      {currentQ.explanation && (
+                        <p className="text-slate-400 text-sm mt-2 text-center italic px-4">{currentQ.explanation}</p>
+                      )}
                     </motion.div>
                   )}
                   {feedback === 'timeout' && (
-                    <motion.div key="timeout" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2 text-orange-400 font-bold text-2xl bg-orange-500/10 border border-orange-500/20 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.2)]">
-                      <Clock size={28} /> Hết giờ!
+                    <motion.div key="timeout" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex flex-col items-center gap-2">
+                      <div className="flex items-center gap-2 text-orange-400 font-bold text-2xl bg-orange-500/10 border border-orange-500/20 px-6 py-2 rounded-full shadow-[0_0_20px_rgba(249,115,22,0.2)]">
+                        <Clock size={28} /> Hết giờ!
+                      </div>
+                      {currentQ.explanation && (
+                        <p className="text-slate-400 text-sm mt-2 text-center italic px-4">{currentQ.explanation}</p>
+                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
