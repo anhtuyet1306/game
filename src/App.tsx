@@ -164,8 +164,10 @@ function GameContent() {
   const [isGuestLoggingIn, setIsGuestLoggingIn] = useState(false);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [dbQuestions, setDbQuestions] = useState<Question[]>([]);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
+    if (!isAuthReady) return;
     const unsubscribe = subscribeToQuestions((data) => {
       const mapped: Question[] = data.map(q => ({
         id: q.id,
@@ -178,12 +180,11 @@ function GameContent() {
       setDbQuestions(mapped);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isAuthReady]);
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [newName, setNewName] = useState('');
 
@@ -464,7 +465,7 @@ function GameContent() {
         </div>
 
         <div className="flex gap-1.5 sm:gap-2 pointer-events-auto">
-          {userProfile?.role === 'admin' && (
+          {(userProfile?.role === 'admin' || currentUser?.email === 'dangtuyet969@gmail.com') && (
             <button 
               onClick={() => setShowAdminPanel(true)}
               className="p-2.5 sm:p-3 bg-indigo-600/80 backdrop-blur-md border border-indigo-500/50 rounded-full shadow-lg text-white hover:bg-indigo-500 transition-colors"

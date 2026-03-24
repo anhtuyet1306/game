@@ -101,15 +101,19 @@ testConnection();
 // Auth Functions
 export const initializeUserProfile = async (user: FirebaseUser) => {
   const path = `users/${user.uid}`;
+  const isAdminEmail = user.email === 'dangtuyet969@gmail.com';
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) {
       await setDoc(doc(db, 'users', user.uid), {
         username: user.displayName || 'Người chơi ẩn danh',
         email: user.email || null,
-        role: 'user',
+        role: isAdminEmail ? 'admin' : 'user',
         createdAt: serverTimestamp()
       });
+    } else if (isAdminEmail && userDoc.data().role !== 'admin') {
+      // Ensure the specific email always has admin role
+      await setDoc(doc(db, 'users', user.uid), { role: 'admin' }, { merge: true });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -286,4 +290,49 @@ export const deleteQuestion = async (id: string) => {
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
   }
+};
+
+export const subscribeToGlobalStats = (callback: (stats: any) => void) => {
+  const historyPath = 'history';
+  const usersPath = 'users';
+  const questionsPath = 'questions';
+
+  let stats = {
+    totalGames: 0,
+    totalUsers: 0,
+    totalQuestions: 0,
+    totalScore: 0
+  };
+
+  const unsubHistory = onSnapshot(collection(db, historyPath), (snapshot) => {
+    stats.totalGames = snapshot.size;
+    let score = 0;
+    snapshot.docs.forEach(doc => {
+      score += doc.data().score || 0;
+    });
+    stats.totalScore = score;
+    callback({ ...stats });
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, historyPath);
+  });
+
+  const unsubUsers = onSnapshot(collection(db, usersPath), (snapshot) => {
+    stats.totalUsers = snapshot.size;
+    callback({ ...stats });
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, usersPath);
+  });
+
+  const unsubQuestions = onSnapshot(collection(db, questionsPath), (snapshot) => {
+    stats.totalQuestions = snapshot.size;
+    callback({ ...stats });
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, questionsPath);
+  });
+
+  return () => {
+    unsubHistory();
+    unsubUsers();
+    unsubQuestions();
+  };
 };

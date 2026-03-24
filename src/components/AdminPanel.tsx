@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash2, Save, X, Settings, List, Users, BarChart } from 'lucide-react';
-import { addQuestion, subscribeToQuestions, deleteQuestion } from '../firebase';
+import { Plus, Trash2, Save, X, Settings, List, Users, BarChart, Trophy, Activity, MessageSquare } from 'lucide-react';
+import { addQuestion, subscribeToQuestions, deleteQuestion, subscribeToGlobalStats, db } from '../firebase';
+import { collection, onSnapshot, query, limit } from 'firebase/firestore';
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -10,6 +11,13 @@ interface AdminPanelProps {
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   const [activeTab, setActiveTab] = useState<'questions' | 'users' | 'stats'>('questions');
   const [questions, setQuestions] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [globalStats, setGlobalStats] = useState({
+    totalGames: 0,
+    totalUsers: 0,
+    totalQuestions: 0,
+    totalScore: 0
+  });
   const [newQuestion, setNewQuestion] = useState({
     type: 'logic',
     text: '',
@@ -19,8 +27,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
   });
 
   useEffect(() => {
-    const unsubscribe = subscribeToQuestions(setQuestions);
-    return () => unsubscribe();
+    const unsubQuestions = subscribeToQuestions(setQuestions);
+    const unsubStats = subscribeToGlobalStats(setGlobalStats);
+    
+    // Simple user list subscription
+    const unsubUsers = onSnapshot(query(collection(db, 'users'), limit(50)), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error('User list error:', error);
+    });
+
+    return () => {
+      unsubQuestions();
+      unsubStats();
+      unsubUsers();
+    };
   }, []);
 
   const handleAddQuestion = async () => {
@@ -206,16 +227,81 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose }) => {
           )}
 
           {activeTab === 'users' && (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4">
-              <Users size={48} className="opacity-20" />
-              <p>Tính năng quản lý người dùng đang được phát triển...</p>
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Users size={20} className="text-indigo-400" />
+                Danh sách người dùng ({users.length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {users.map((user) => (
+                  <div key={user.id} className="bg-slate-900/30 border border-slate-800 p-4 rounded-2xl flex items-center gap-3">
+                    <div className="w-10 h-10 bg-indigo-500/20 rounded-full flex items-center justify-center text-indigo-400 font-bold">
+                      {user.username?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                    <div>
+                      <p className="text-white font-medium text-sm">{user.username}</p>
+                      <p className="text-slate-500 text-xs">{user.email || 'Ẩn danh'}</p>
+                    </div>
+                    <div className="ml-auto">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${user.role === 'admin' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'bg-slate-800 text-slate-500'}`}>
+                        {user.role}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {activeTab === 'stats' && (
-            <div className="flex flex-col items-center justify-center h-full text-slate-500 space-y-4">
-              <BarChart size={48} className="opacity-20" />
-              <p>Tính năng thống kê hệ thống đang được phát triển...</p>
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <BarChart size={20} className="text-indigo-400" />
+                Thống kê hệ thống
+              </h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl text-center">
+                  <Activity className="text-blue-400 mx-auto mb-2" size={24} />
+                  <p className="text-2xl font-bold text-white">{globalStats.totalGames}</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Lượt chơi</p>
+                </div>
+                <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl text-center">
+                  <Users className="text-indigo-400 mx-auto mb-2" size={24} />
+                  <p className="text-2xl font-bold text-white">{globalStats.totalUsers}</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Người dùng</p>
+                </div>
+                <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl text-center">
+                  <MessageSquare className="text-emerald-400 mx-auto mb-2" size={24} />
+                  <p className="text-2xl font-bold text-white">{globalStats.totalQuestions}</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Câu hỏi DB</p>
+                </div>
+                <div className="bg-slate-900/50 border border-slate-800 p-6 rounded-2xl text-center">
+                  <Trophy className="text-amber-400 mx-auto mb-2" size={24} />
+                  <p className="text-2xl font-bold text-white">{globalStats.totalScore}</p>
+                  <p className="text-xs text-slate-500 uppercase font-bold">Tổng điểm</p>
+                </div>
+              </div>
+
+              <div className="bg-slate-900/30 border border-slate-800 p-6 rounded-2xl">
+                <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Hiệu suất hệ thống</h4>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-slate-400">Điểm trung bình mỗi trận</span>
+                      <span className="text-indigo-400 font-bold">
+                        {globalStats.totalGames > 0 ? (globalStats.totalScore / globalStats.totalGames).toFixed(1) : 0}
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-500 h-full" style={{ width: '65%' }}></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 italic">
+                    * Thống kê được cập nhật thời gian thực từ Firestore.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>
