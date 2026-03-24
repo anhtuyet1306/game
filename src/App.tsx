@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X } from 'lucide-react';
+import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X, Home } from 'lucide-react';
 import { LOGIC_QUESTIONS, PROVERB_QUESTIONS, GENZ_QUESTIONS } from './questions';
 import { initAudio, toggleMute, getIsMuted, playCorrect, playIncorrect, playTimeout, playClick, playGameOver } from './audio';
-import { auth, loginWithGoogle, handleRedirectResult, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile } from './firebase';
+import { auth, loginWithGoogle, loginAnonymously, handleRedirectResult, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // Error Boundary Component
@@ -223,14 +223,24 @@ function GameContent() {
       const errorCode = error.code || 'unknown';
       
       if (errorCode === 'auth/unauthorized-domain') {
-        alert("Lỗi: Tên miền này chưa được cấp phép trong Firebase. Vui lòng thêm 'game-coral-six-89.vercel.app' vào danh sách 'Authorized domains' trong Firebase Console.");
+        alert("Lỗi: Tên miền này chưa được cấp phép trong Firebase. Vui lòng thêm '" + window.location.hostname + "' vào danh sách 'Authorized domains' trong Firebase Console.");
       } else if (error.message?.includes('disallowed_useragent') || errorCode === 'auth/web-storage-unsupported') {
-        alert("Google không cho phép đăng nhập bên trong ứng dụng Zalo/Facebook. Vui lòng nhấn vào dấu 3 chấm (...) ở góc trên bên phải và chọn 'Mở bằng trình duyệt' (Safari/Chrome) để chơi.");
+        alert("Google không cho phép đăng nhập bên trong ứng dụng Zalo/Facebook. Bạn có thể nhấn 'Chơi ngay (Khách)' bên cạnh hoặc mở bằng trình duyệt ngoài (Safari/Chrome).");
       } else if (window.self !== window.top) {
-        alert(`Đăng nhập bị chặn (Lỗi: ${errorCode}). Vui lòng nhấn vào biểu tượng 'Mở trong tab mới' (ở góc trên bên phải) để đăng nhập.`);
+        alert(`Đăng nhập bị chặn (Lỗi: ${errorCode}). Vui lòng nhấn vào biểu tượng 'Mở trong tab mới' để đăng nhập.`);
       } else {
-        alert(`Đăng nhập thất bại (Lỗi: ${errorCode}). Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.`);
+        alert(`Đăng nhập thất bại (Lỗi: ${errorCode}). Vui lòng thử lại sau.`);
       }
+    }
+  };
+
+  const handleGuestLogin = async () => {
+    try {
+      await loginAnonymously();
+      setGameState('home');
+    } catch (error: any) {
+      console.error('Guest login failed', error);
+      alert("Không thể đăng nhập khách. Vui lòng thử lại sau.");
     }
   };
 
@@ -343,86 +353,95 @@ function GameContent() {
   const currentQ = questions[currentIndex];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans overflow-hidden flex items-center justify-center p-4 relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-purple-950 to-slate-950">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans overflow-y-auto flex flex-col items-center justify-start sm:justify-center p-4 pt-24 sm:pt-4 relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-purple-950 to-slate-950">
       
       {/* Top Navigation */}
-      <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-50">
-        <div className="flex gap-2">
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-start z-50 pointer-events-none">
+        <div className="flex flex-col gap-2 pointer-events-auto">
           {isAuthReady && currentUser ? (
-            <div className="flex items-center gap-2 bg-slate-800/80 backdrop-blur-md border border-slate-700 px-4 py-2 rounded-full shadow-lg">
-              <User size={18} className="text-indigo-400" />
+            <div className="flex items-center gap-2 bg-slate-800/80 backdrop-blur-md border border-slate-700 px-3 py-1.5 rounded-full shadow-lg max-w-[180px] sm:max-w-none">
+              <User size={16} className="text-indigo-400 shrink-0" />
               {isEditingName ? (
                 <div className="flex items-center gap-1">
                   <input 
                     type="text" 
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    className="bg-slate-700 border border-slate-600 rounded px-2 py-0.5 text-xs text-white focus:outline-none w-24"
+                    className="bg-slate-700 border border-slate-600 rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none w-16 sm:w-24"
                     maxLength={20}
                     autoFocus
                   />
                   <button onClick={handleUpdateName} className="text-green-400 hover:text-green-300">
-                    <Check size={14} />
+                    <Check size={12} />
                   </button>
                   <button onClick={() => { setIsEditingName(false); setNewName(userProfile?.username || ''); }} className="text-red-400 hover:text-red-300">
-                    <X size={14} />
+                    <X size={12} />
                   </button>
                 </div>
               ) : (
                 <>
-                  <span className="text-sm font-semibold text-slate-300">{userProfile?.username || currentUser.displayName}</span>
-                  <button onClick={() => setIsEditingName(true)} className="text-slate-500 hover:text-indigo-400 transition-colors">
-                    <Edit2 size={14} />
+                  <span className="text-xs sm:text-sm font-semibold text-slate-300 truncate">{userProfile?.username || currentUser.displayName}</span>
+                  <button onClick={() => setIsEditingName(true)} className="text-slate-500 hover:text-indigo-400 transition-colors shrink-0">
+                    <Edit2 size={12} />
                   </button>
                 </>
               )}
-              <button onClick={handleLogout} className="ml-2 text-slate-500 hover:text-red-400 transition-colors">
-                <LogOut size={16} />
+              <button onClick={handleLogout} className="ml-1 text-slate-500 hover:text-red-400 transition-colors shrink-0">
+                <LogOut size={14} />
               </button>
             </div>
           ) : isAuthReady ? (
-            <button 
-              onClick={handleLogin}
-              className="flex items-center gap-2 bg-indigo-600/80 hover:bg-indigo-500 backdrop-blur-md border border-indigo-500/50 px-4 py-2 rounded-full shadow-lg text-sm font-semibold transition-colors"
-            >
-              <User size={18} /> Đăng nhập Google
-            </button>
+            <div className="flex flex-col gap-1.5">
+              <button 
+                onClick={handleLogin}
+                className="flex items-center gap-1.5 bg-indigo-600/80 hover:bg-indigo-500 backdrop-blur-md border border-indigo-500/50 px-3 py-1.5 rounded-full shadow-lg text-[10px] sm:text-xs font-semibold transition-colors"
+              >
+                <User size={14} /> <span className="hidden sm:inline">Đăng nhập Google</span><span className="sm:hidden">Google</span>
+              </button>
+              <button 
+                onClick={handleGuestLogin}
+                className="flex items-center gap-1.5 bg-slate-700/80 hover:bg-slate-600 backdrop-blur-md border border-slate-600 px-3 py-1.5 rounded-full shadow-lg text-[10px] sm:text-xs font-semibold transition-colors text-slate-200"
+              >
+                <User size={14} /> <span className="hidden sm:inline">Chơi ngay (Khách)</span><span className="sm:hidden">Khách</span>
+              </button>
+            </div>
           ) : (
-            <div className="w-32 h-10 bg-slate-800/50 animate-pulse rounded-full"></div>
-          )}
-          
-          {gameState !== 'home' && (
-            <button 
-              onClick={() => setGameState('home')}
-              className="bg-slate-800/80 backdrop-blur-md border border-slate-700 px-4 py-2 rounded-full shadow-lg text-sm font-semibold text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
-            >
-              Trang chủ
-            </button>
+            <div className="w-24 sm:w-32 h-8 sm:h-10 bg-slate-800/50 animate-pulse rounded-full"></div>
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 sm:gap-2 pointer-events-auto">
+          {gameState !== 'home' && (
+            <button 
+              onClick={() => setGameState('home')}
+              className="p-2.5 sm:p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+              title="Trang chủ"
+            >
+              <Home size={18} className="sm:hidden" />
+              <span className="hidden sm:inline text-xs font-bold">Trang chủ</span>
+            </button>
+          )}
           <button 
             onClick={() => setGameState('leaderboard')}
-            className="p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-yellow-500 hover:text-yellow-400 hover:bg-slate-700 transition-colors"
+            className="p-2.5 sm:p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-yellow-500 hover:text-yellow-400 hover:bg-slate-700 transition-colors"
             title="Bảng xếp hạng"
           >
-            <ListOrdered size={20} />
+            <ListOrdered size={18} className="sm:w-5 sm:h-5" />
           </button>
           {currentUser && (
             <button 
               onClick={() => setGameState('stats')}
-              className="p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-emerald-500 hover:text-emerald-400 hover:bg-slate-700 transition-colors"
+              className="p-2.5 sm:p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-emerald-500 hover:text-emerald-400 hover:bg-slate-700 transition-colors"
               title="Thống kê"
             >
-              <BarChart3 size={20} />
+              <BarChart3 size={18} className="sm:w-5 sm:h-5" />
             </button>
           )}
           <button 
             onClick={handleToggleMute}
-            className="p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+            className="p-2.5 sm:p-3 bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-full shadow-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
           >
-            {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+            {isMuted ? <VolumeX size={18} className="sm:w-5 sm:h-5" /> : <Volume2 size={18} className="sm:w-5 sm:h-5" />}
           </button>
         </div>
       </div>
@@ -461,10 +480,22 @@ function GameContent() {
                 </div>
               </div>
 
-              <button onClick={startGame} className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] hover:-translate-y-1">
-                <Play size={24} fill="currentColor" />
-                BẮT ĐẦU CHƠI
-              </button>
+              <div className="flex flex-col gap-3">
+                <button onClick={startGame} className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.4)] hover:shadow-[0_0_30px_rgba(99,102,241,0.6)] hover:-translate-y-1">
+                  <Play size={24} fill="currentColor" />
+                  BẮT ĐẦU CHƠI
+                </button>
+                
+                {!currentUser && isAuthReady && (
+                  <button 
+                    onClick={handleGuestLogin}
+                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                  >
+                    <User size={18} />
+                    CHƠI NGAY (KHÁCH)
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
@@ -480,12 +511,12 @@ function GameContent() {
           >
             <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden p-6 md:p-8 border border-slate-700/50">
               {/* Header */}
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
-                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-4 py-2 rounded-full shadow-inner w-full sm:w-auto justify-center">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mb-6">
+                <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-full shadow-inner w-full sm:w-auto justify-center">
                   {getTypeIcon(currentQ.type)}
-                  <span className="text-sm font-bold text-slate-300 uppercase tracking-wider">{getTypeName(currentQ.type)}</span>
+                  <span className="text-xs sm:text-sm font-bold text-slate-300 uppercase tracking-wider">{getTypeName(currentQ.type)}</span>
                 </div>
-                <div className="text-indigo-300 font-bold bg-indigo-500/10 border border-indigo-500/20 px-4 py-2 rounded-full w-full sm:w-auto text-center">
+                <div className="text-indigo-300 font-bold bg-indigo-500/10 border border-indigo-500/20 px-3 py-1.5 rounded-full w-full sm:w-auto text-center text-xs sm:text-sm">
                   Câu {currentIndex + 1}/{questions.length}
                 </div>
               </div>

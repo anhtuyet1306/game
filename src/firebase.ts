@@ -5,6 +5,7 @@ import {
   signInWithPopup, 
   signInWithRedirect,
   getRedirectResult,
+  signInAnonymously,
   signOut, 
   onAuthStateChanged, 
   User as FirebaseUser 
@@ -118,10 +119,8 @@ export const loginWithGoogle = async () => {
   const userAgent = navigator.userAgent || '';
   const isZalo = /Zalo/i.test(userAgent);
   const isFB = /FBAN|FBAV/i.test(userAgent);
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
   // In-app browsers (Zalo, FB) block popups, so use redirect.
-  // Standalone mobile browsers (Safari, Chrome) handle popups better for auth persistence.
   const useRedirect = isZalo || isFB;
   
   try {
@@ -134,6 +133,17 @@ export const loginWithGoogle = async () => {
     }
   } catch (error) {
     console.error('Login error:', error);
+    throw error;
+  }
+};
+
+export const loginAnonymously = async () => {
+  try {
+    const result = await signInAnonymously(auth);
+    await initializeUserProfile(result.user);
+    return result.user;
+  } catch (error) {
+    console.error('Anonymous login error:', error);
     throw error;
   }
 };
