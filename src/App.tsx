@@ -220,8 +220,12 @@ function GameContent() {
     } catch (error: any) {
       console.error('Login failed', error);
       const errorCode = error.code || 'unknown';
-      // Check if we are in an iframe (common issue for mobile login)
-      if (window.self !== window.top) {
+      
+      if (errorCode === 'auth/unauthorized-domain') {
+        alert("Lỗi: Tên miền này chưa được cấp phép trong Firebase. Vui lòng thêm 'game-coral-six-89.vercel.app' vào danh sách 'Authorized domains' trong Firebase Console.");
+      } else if (error.message?.includes('disallowed_useragent') || errorCode === 'auth/web-storage-unsupported') {
+        alert("Google không cho phép đăng nhập bên trong ứng dụng Zalo/Facebook. Vui lòng nhấn vào dấu 3 chấm (...) ở góc trên bên phải và chọn 'Mở bằng trình duyệt' (Safari/Chrome) để chơi.");
+      } else if (window.self !== window.top) {
         alert(`Đăng nhập bị chặn (Lỗi: ${errorCode}). Vui lòng nhấn vào biểu tượng 'Mở trong tab mới' (ở góc trên bên phải) để đăng nhập.`);
       } else {
         alert(`Đăng nhập thất bại (Lỗi: ${errorCode}). Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.`);

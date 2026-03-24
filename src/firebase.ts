@@ -115,11 +115,17 @@ export const initializeUserProfile = async (user: FirebaseUser) => {
 };
 
 export const loginWithGoogle = async () => {
-  // For mobile, redirect is often more reliable
+  const userAgent = navigator.userAgent || '';
+  const isZalo = /Zalo/i.test(userAgent);
+  const isFB = /FBAN|FBAV/i.test(userAgent);
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
+  // In-app browsers (Zalo, FB) block popups, so use redirect.
+  // Standalone mobile browsers (Safari, Chrome) handle popups better for auth persistence.
+  const useRedirect = isZalo || isFB;
+  
   try {
-    if (isMobile) {
+    if (useRedirect) {
       await signInWithRedirect(auth, googleProvider);
     } else {
       const result = await signInWithPopup(auth, googleProvider);
