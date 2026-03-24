@@ -248,10 +248,23 @@ function GameContent() {
       setGameState('home');
     } catch (error: any) {
       console.error('Guest login failed', error);
-      if (error.message?.includes('operation-not-allowed')) {
+      const errorCode = error.code || '';
+      const errorMessage = error.message || '';
+      
+      if (errorCode === 'auth/operation-not-allowed' || errorMessage.includes('operation-not-allowed')) {
         alert("Lỗi: Chế độ đăng nhập Khách chưa được bật trong Firebase. Vui lòng bật 'Anonymous' trong phần Authentication -> Sign-in method.");
       } else {
-        alert("Không thể đăng nhập khách. Vui lòng thử lại sau.");
+        // Check if it's a JSON error from handleFirestoreError
+        let displayError = errorMessage;
+        try {
+          const parsed = JSON.parse(errorMessage);
+          if (parsed.error) displayError = parsed.error;
+        } catch (e) {
+          // Not JSON
+        }
+        
+        const detail = errorCode ? ` (Mã: ${errorCode})` : ` (${displayError})`;
+        alert(`Không thể đăng nhập khách${detail}. Vui lòng thử lại sau.`);
       }
     } finally {
       setIsGuestLoggingIn(false);

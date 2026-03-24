@@ -64,7 +64,7 @@ service cloud.firestore {
     function isValidUser(data) {
       return hasOnlyAllowedFields(['username', 'email', 'role', 'createdAt']) &&
              data.username is string && data.username.size() >= 1 && data.username.size() <= 50 &&
-             isValidEmail(data.get('email', null)) &&
+             (data.email == null || (data.email is string && data.email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"))) &&
              data.role in ['user', 'admin'] &&
              data.createdAt is timestamp;
     }
