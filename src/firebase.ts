@@ -21,6 +21,7 @@ import {
   limit, 
   onSnapshot, 
   addDoc, 
+  deleteDoc,
   getDocFromServer, 
   Timestamp,
   serverTimestamp
@@ -253,4 +254,36 @@ export const subscribeToUserStats = (userId: string, callback: (stats: any) => v
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, path);
   });
+};
+
+export const addQuestion = async (question: any) => {
+  const path = 'questions';
+  try {
+    await addDoc(collection(db, path), {
+      ...question,
+      createdAt: serverTimestamp()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
+export const subscribeToQuestions = (callback: (questions: any[]) => void) => {
+  const path = 'questions';
+  const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+  return onSnapshot(q, (snapshot) => {
+    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    callback(data);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, path);
+  });
+};
+
+export const deleteQuestion = async (id: string) => {
+  const path = `questions/${id}`;
+  try {
+    await deleteDoc(doc(db, 'questions', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
 };

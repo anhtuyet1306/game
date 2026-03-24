@@ -104,6 +104,11 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
     match /{path=**} {
       allow read, write: if false;
     }

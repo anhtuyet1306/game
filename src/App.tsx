@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X, Home } from 'lucide-react';
+import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X, Home, Settings } from 'lucide-react';
 import { LOGIC_QUESTIONS, PROVERB_QUESTIONS, GENZ_QUESTIONS } from './questions';
 import { initAudio, toggleMute, getIsMuted, playCorrect, playIncorrect, playTimeout, playClick, playGameOver } from './audio';
-import { auth, loginWithGoogle, loginAnonymously, handleRedirectResult, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile } from './firebase';
+import { auth, loginWithGoogle, loginAnonymously, handleRedirectResult, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile, subscribeToQuestions } from './firebase';
+import AdminPanel from './components/AdminPanel';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // Error Boundary Component
@@ -61,7 +62,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-type QuestionType = 'math' | 'logic' | 'proverb';
+type QuestionType = 'math' | 'logic' | 'proverb' | 'genz';
 
 type Question = {
   id: string;
@@ -116,7 +117,7 @@ const generateMathQuestion = (id: number): Question => {
   };
 };
 
-const generateGameSession = (): Question[] => {
+const generateGameSession = (dbQuestions: Question[] = []): Question[] => {
   // 5 Math, 5 Logic, 5 Proverbs, 5 GenZ = 20 questions per session
   const mathQs = Array.from({ length: 5 }, (_, i) => generateMathQuestion(i));
   
@@ -132,7 +133,11 @@ const generateGameSession = (): Question[] => {
     id: `g${i}`, type: 'logic' as QuestionType, text: q.text, options: shuffleArray(q.options), answer: q.answer
   }));
 
-  return shuffleArray([...mathQs, ...shuffledLogic, ...shuffledProverbs, ...shuffledGenZ]);
+  // Add some from DB if available
+  const dbQs = shuffleArray(dbQuestions).slice(0, 5);
+
+  const pool = [...mathQs, ...shuffledLogic, ...shuffledProverbs, ...shuffledGenZ, ...dbQs];
+  return shuffleArray(pool).slice(0, 20);
 };
 
 type GameState = 'home' | 'playing' | 'gameover' | 'auth' | 'leaderboard' | 'stats';
@@ -157,6 +162,23 @@ function GameContent() {
   const [isMuted, setIsMuted] = useState(getIsMuted());
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isGuestLoggingIn, setIsGuestLoggingIn] = useState(false);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [dbQuestions, setDbQuestions] = useState<Question[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToQuestions((data) => {
+      const mapped: Question[] = data.map(q => ({
+        id: q.id,
+        type: q.type as QuestionType,
+        text: q.text,
+        options: q.options,
+        answer: q.answer,
+        explanation: q.explanation
+      }));
+      setDbQuestions(mapped);
+    });
+    return () => unsubscribe();
+  }, []);
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -296,7 +318,7 @@ function GameContent() {
   const startGame = () => {
     initAudio();
     playClick();
-    setQuestions(generateGameSession());
+    setQuestions(generateGameSession(dbQuestions));
     setCurrentIndex(0);
     setScore(0);
     setUserAnswer('');
@@ -366,6 +388,7 @@ function GameContent() {
       case 'math': return <Calculator size={20} className="text-blue-400" />;
       case 'logic': return <Lightbulb size={20} className="text-yellow-400" />;
       case 'proverb': return <BookOpen size={20} className="text-emerald-400" />;
+      case 'genz': return <Brain size={20} className="text-pink-400" />;
     }
   };
 
@@ -374,6 +397,7 @@ function GameContent() {
       case 'math': return 'Toán học';
       case 'logic': return 'Đố mẹo';
       case 'proverb': return 'Ca dao tục ngữ';
+      case 'genz': return 'Ngôn ngữ GenZ';
     }
   };
 
@@ -440,6 +464,15 @@ function GameContent() {
         </div>
 
         <div className="flex gap-1.5 sm:gap-2 pointer-events-auto">
+          {userProfile?.role === 'admin' && (
+            <button 
+              onClick={() => setShowAdminPanel(true)}
+              className="p-2.5 sm:p-3 bg-indigo-600/80 backdrop-blur-md border border-indigo-500/50 rounded-full shadow-lg text-white hover:bg-indigo-500 transition-colors"
+              title="Quản trị"
+            >
+              <Settings size={18} />
+            </button>
+          )}
           {gameState !== 'home' && (
             <button 
               onClick={() => setGameState('home')}
@@ -790,6 +823,8 @@ function GameContent() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Admin Panel */}
+      {showAdminPanel && <AdminPanel onClose={() => setShowAdminPanel(false)} />}
     </div>
   );
 }
