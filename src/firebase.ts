@@ -105,7 +105,7 @@ export const initializeUserProfile = async (user: FirebaseUser) => {
     if (!userDoc.exists()) {
       await setDoc(doc(db, 'users', user.uid), {
         username: user.displayName || 'Người chơi ẩn danh',
-        email: user.email,
+        email: user.email || null,
         role: 'user',
         createdAt: serverTimestamp()
       });

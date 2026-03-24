@@ -44,7 +44,7 @@ service cloud.firestore {
     }
 
     function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+      return email == null || (email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"));
     }
 
     function isRecent(time) {
@@ -64,7 +64,7 @@ service cloud.firestore {
     function isValidUser(data) {
       return hasOnlyAllowedFields(['username', 'email', 'role', 'createdAt']) &&
              data.username is string && data.username.size() >= 1 && data.username.size() <= 50 &&
-             isValidEmail(data.email) &&
+             isValidEmail(data.get('email', null)) &&
              data.role in ['user', 'admin'] &&
              data.createdAt is timestamp;
     }

@@ -155,6 +155,8 @@ function GameContent() {
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | 'timeout' | null>(null);
   const [timeLeft, setTimeLeft] = useState(TIME_PER_QUESTION);
   const [isMuted, setIsMuted] = useState(getIsMuted());
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isGuestLoggingIn, setIsGuestLoggingIn] = useState(false);
   
   // Auth state
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
@@ -213,6 +215,8 @@ function GameContent() {
   }, [gameState, currentUser]);
 
   const handleLogin = async () => {
+    if (isLoggingIn || isGuestLoggingIn) return;
+    setIsLoggingIn(true);
     try {
       const user = await loginWithGoogle();
       if (user) {
@@ -231,16 +235,26 @@ function GameContent() {
       } else {
         alert(`Đăng nhập thất bại (Lỗi: ${errorCode}). Vui lòng thử lại sau.`);
       }
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
   const handleGuestLogin = async () => {
+    if (isLoggingIn || isGuestLoggingIn) return;
+    setIsGuestLoggingIn(true);
     try {
       await loginAnonymously();
       setGameState('home');
     } catch (error: any) {
       console.error('Guest login failed', error);
-      alert("Không thể đăng nhập khách. Vui lòng thử lại sau.");
+      if (error.message?.includes('operation-not-allowed')) {
+        alert("Lỗi: Chế độ đăng nhập Khách chưa được bật trong Firebase. Vui lòng bật 'Anonymous' trong phần Authentication -> Sign-in method.");
+      } else {
+        alert("Không thể đăng nhập khách. Vui lòng thử lại sau.");
+      }
+    } finally {
+      setIsGuestLoggingIn(false);
     }
   };
 
@@ -394,15 +408,17 @@ function GameContent() {
             <div className="flex flex-col gap-1.5">
               <button 
                 onClick={handleLogin}
-                className="flex items-center gap-1.5 bg-indigo-600/80 hover:bg-indigo-500 backdrop-blur-md border border-indigo-500/50 px-3 py-1.5 rounded-full shadow-lg text-[10px] sm:text-xs font-semibold transition-colors"
+                disabled={isLoggingIn || isGuestLoggingIn}
+                className={`flex items-center gap-1.5 bg-indigo-600/80 hover:bg-indigo-500 backdrop-blur-md border border-indigo-500/50 px-3 py-1.5 rounded-full shadow-lg text-[10px] sm:text-xs font-semibold transition-colors ${isLoggingIn ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
               >
-                <User size={14} /> <span className="hidden sm:inline">Đăng nhập Google</span><span className="sm:hidden">Google</span>
+                <User size={14} /> <span className="hidden sm:inline">{isLoggingIn ? 'Đang xử lý...' : 'Đăng nhập Google'}</span><span className="sm:hidden">{isLoggingIn ? '...' : 'Google'}</span>
               </button>
               <button 
                 onClick={handleGuestLogin}
-                className="flex items-center gap-1.5 bg-slate-700/80 hover:bg-slate-600 backdrop-blur-md border border-slate-600 px-3 py-1.5 rounded-full shadow-lg text-[10px] sm:text-xs font-semibold transition-colors text-slate-200"
+                disabled={isLoggingIn || isGuestLoggingIn}
+                className={`flex items-center gap-1.5 bg-slate-700/80 hover:bg-slate-600 backdrop-blur-md border border-slate-600 px-3 py-1.5 rounded-full shadow-lg text-[10px] sm:text-xs font-semibold transition-colors text-slate-200 ${isGuestLoggingIn ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
               >
-                <User size={14} /> <span className="hidden sm:inline">Chơi ngay (Khách)</span><span className="sm:hidden">Khách</span>
+                <User size={14} /> <span className="hidden sm:inline">{isGuestLoggingIn ? 'Đang xử lý...' : 'Chơi ngay (Khách)'}</span><span className="sm:hidden">{isGuestLoggingIn ? '...' : 'Khách'}</span>
               </button>
             </div>
           ) : (
@@ -489,10 +505,11 @@ function GameContent() {
                 {!currentUser && isAuthReady && (
                   <button 
                     onClick={handleGuestLogin}
-                    className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition-all border border-slate-700 flex items-center justify-center gap-2"
+                    disabled={isLoggingIn || isGuestLoggingIn}
+                    className={`w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition-all border border-slate-700 flex items-center justify-center gap-2 ${isGuestLoggingIn ? 'opacity-50 cursor-wait' : 'cursor-pointer'}`}
                   >
                     <User size={18} />
-                    CHƠI NGAY (KHÁCH)
+                    {isGuestLoggingIn ? 'ĐANG XỬ LÝ...' : 'CHƠI NGAY (KHÁCH)'}
                   </button>
                 )}
               </div>
