@@ -196,8 +196,14 @@ function GameContent() {
     try {
       await loginWithGoogle();
       setGameState('home');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed', error);
+      // Check if we are in an iframe (common issue for mobile login)
+      if (window.self !== window.top) {
+        alert("Đăng nhập có thể bị chặn trong khung xem trước. Vui lòng nhấn vào biểu tượng 'Mở trong tab mới' (ở góc trên bên phải) để đăng nhập dễ dàng hơn trên điện thoại.");
+      } else {
+        alert("Đăng nhập thất bại. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.");
+      }
     }
   };
 

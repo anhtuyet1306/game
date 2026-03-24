@@ -12,7 +12,7 @@ service cloud.firestore {
     //   - username: string (required, 1-50 chars)
     //   - email: string (required, valid format)
     //   - role: string (required, 'user' or 'admin')
-    //   - createdAt: string (required, ISO 8601)
+    //   - createdAt: timestamp (required)
     //
     // Collection: history
     // Document ID: auto-generated
@@ -21,7 +21,7 @@ service cloud.firestore {
     //   - username: string (required, 1-50 chars)
     //   - score: number (required, >= 0)
     //   - total: number (required, >= 0)
-    //   - timestamp: string (required, ISO 8601)
+    //   - timestamp: timestamp (required)
     //
     // ===============================================================
 
@@ -47,8 +47,10 @@ service cloud.firestore {
       return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     }
 
-    function isValidDateString(dateStr) {
-      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    function isRecent(time) {
+      return time is timestamp && 
+             time > request.time - duration.value(5, 'm') &&
+             time < request.time + duration.value(5, 'm');
     }
 
     function hasOnlyAllowedFields(fields) {
@@ -64,7 +66,7 @@ service cloud.firestore {
              data.username is string && data.username.size() >= 1 && data.username.size() <= 50 &&
              isValidEmail(data.email) &&
              data.role in ['user', 'admin'] &&
-             isValidDateString(data.createdAt);
+             data.createdAt is timestamp;
     }
 
     function isValidGameRecord(data) {
@@ -73,7 +75,7 @@ service cloud.firestore {
              data.username is string && data.username.size() >= 1 && data.username.size() <= 50 &&
              data.score is int && data.score >= 0 &&
              data.total is int && data.total >= 0 &&
-             isValidDateString(data.timestamp);
+             isRecent(data.timestamp);
     }
 
     // ===============================================================
@@ -82,8 +84,17 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user';
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role;
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'user' && isRecent(request.resource.data.createdAt);
+      allow update: if isOwner(userId) && 
+                      (
+                        // Full update
+                        (isValidUser(request.resource.data) && request.resource.data.role == resource.data.role && request.resource.data.createdAt == resource.data.createdAt) ||
+                        // Partial update (just username)
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['username']) && 
+                         request.resource.data.username is string && 
+                         request.resource.data.username.size() >= 1 && 
+                         request.resource.data.username.size() <= 50)
+                      );
       allow delete: if isAdmin();
     }
 

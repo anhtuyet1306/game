@@ -86,7 +86,7 @@ export const loginWithGoogle = async () => {
         username: user.displayName || 'Người chơi ẩn danh',
         email: user.email,
         role: 'user',
-        createdAt: new Date().toISOString()
+        createdAt: serverTimestamp()
       });
     }
     return user;
@@ -128,7 +128,7 @@ export const saveGameRecord = async (userId: string, username: string, score: nu
       username,
       score,
       total,
-      timestamp: new Date().toISOString()
+      timestamp: serverTimestamp()
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -137,7 +137,7 @@ export const saveGameRecord = async (userId: string, username: string, score: nu
 
 export const subscribeToLeaderboard = (callback: (data: any[]) => void) => {
   const path = 'history';
-  const q = query(collection(db, path), orderBy('score', 'desc'), limit(10));
+  const q = query(collection(db, path), orderBy('score', 'desc'), limit(100));
   
   return onSnapshot(q, (snapshot) => {
     const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
