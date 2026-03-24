@@ -292,6 +292,18 @@ export const deleteQuestion = async (id: string) => {
   }
 };
 
+export const updateQuestion = async (id: string, question: any) => {
+  const path = `questions/${id}`;
+  try {
+    await setDoc(doc(db, 'questions', id), {
+      ...question,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+};
+
 export const subscribeToGlobalStats = (callback: (stats: any) => void) => {
   const historyPath = 'history';
   const usersPath = 'users';

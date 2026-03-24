@@ -1,3 +1,4 @@
+// App Version: 1.2.0 - Admin Features Update
 import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X, Home, Settings } from 'lucide-react';
