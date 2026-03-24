@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Brain, Play, RotateCcw, CheckCircle2, XCircle, Trophy, Lightbulb, BookOpen, Calculator, Clock, Volume2, VolumeX, User, LogOut, BarChart3, ListOrdered, AlertCircle, Edit2, Check, X } from 'lucide-react';
-import { LOGIC_QUESTIONS, PROVERB_QUESTIONS } from './questions';
+import { LOGIC_QUESTIONS, PROVERB_QUESTIONS, GENZ_QUESTIONS } from './questions';
 import { initAudio, toggleMute, getIsMuted, playCorrect, playIncorrect, playTimeout, playClick, playGameOver } from './audio';
-import { auth, loginWithGoogle, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile } from './firebase';
+import { auth, loginWithGoogle, handleRedirectResult, logoutUser, saveGameRecord, subscribeToLeaderboard, subscribeToUserStats, updateUsername, subscribeToUserProfile } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 
 // Error Boundary Component
@@ -116,18 +116,22 @@ const generateMathQuestion = (id: number): Question => {
 };
 
 const generateGameSession = (): Question[] => {
-  // 8 Math, 6 Logic, 6 Proverbs = 20 questions per session
-  const mathQs = Array.from({ length: 8 }, (_, i) => generateMathQuestion(i));
+  // 5 Math, 5 Logic, 5 Proverbs, 5 GenZ = 20 questions per session
+  const mathQs = Array.from({ length: 5 }, (_, i) => generateMathQuestion(i));
   
-  const shuffledLogic = shuffleArray(LOGIC_QUESTIONS).slice(0, 6).map((q, i) => ({
+  const shuffledLogic = shuffleArray(LOGIC_QUESTIONS).slice(0, 5).map((q, i) => ({
     id: `l${i}`, type: 'logic' as QuestionType, text: q.text, options: shuffleArray(q.options), answer: q.answer
   }));
   
-  const shuffledProverbs = shuffleArray(PROVERB_QUESTIONS).slice(0, 6).map((q, i) => ({
+  const shuffledProverbs = shuffleArray(PROVERB_QUESTIONS).slice(0, 5).map((q, i) => ({
     id: `p${i}`, type: 'proverb' as QuestionType, text: q.text, options: shuffleArray(q.options), answer: q.answer
   }));
 
-  return shuffleArray([...mathQs, ...shuffledLogic, ...shuffledProverbs]);
+  const shuffledGenZ = shuffleArray(GENZ_QUESTIONS).slice(0, 5).map((q, i) => ({
+    id: `g${i}`, type: 'logic' as QuestionType, text: q.text, options: shuffleArray(q.options), answer: q.answer
+  }));
+
+  return shuffleArray([...mathQs, ...shuffledLogic, ...shuffledProverbs, ...shuffledGenZ]);
 };
 
 type GameState = 'home' | 'playing' | 'gameover' | 'auth' | 'leaderboard' | 'stats';
@@ -167,6 +171,21 @@ function GameContent() {
       setCurrentUser(user);
       setIsAuthReady(true);
     });
+
+    // Check for redirect result on mount
+    const checkRedirect = async () => {
+      try {
+        const user = await handleRedirectResult();
+        if (user) {
+          setCurrentUser(user);
+          setGameState('home');
+        }
+      } catch (error) {
+        console.error("Redirect check failed", error);
+      }
+    };
+    checkRedirect();
+
     return () => unsubscribe();
   }, []);
 
@@ -194,15 +213,18 @@ function GameContent() {
 
   const handleLogin = async () => {
     try {
-      await loginWithGoogle();
-      setGameState('home');
+      const user = await loginWithGoogle();
+      if (user) {
+        setGameState('home');
+      }
     } catch (error: any) {
       console.error('Login failed', error);
+      const errorCode = error.code || 'unknown';
       // Check if we are in an iframe (common issue for mobile login)
       if (window.self !== window.top) {
-        alert("Đăng nhập có thể bị chặn trong khung xem trước. Vui lòng nhấn vào biểu tượng 'Mở trong tab mới' (ở góc trên bên phải) để đăng nhập dễ dàng hơn trên điện thoại.");
+        alert(`Đăng nhập bị chặn (Lỗi: ${errorCode}). Vui lòng nhấn vào biểu tượng 'Mở trong tab mới' (ở góc trên bên phải) để đăng nhập.`);
       } else {
-        alert("Đăng nhập thất bại. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.");
+        alert(`Đăng nhập thất bại (Lỗi: ${errorCode}). Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.`);
       }
     }
   };

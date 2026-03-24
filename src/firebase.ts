@@ -1,6 +1,29 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, onSnapshot, addDoc, getDocFromServer, Timestamp } from 'firebase/firestore';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
+  signOut, 
+  onAuthStateChanged, 
+  User as FirebaseUser 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  query, 
+  orderBy, 
+  limit, 
+  onSnapshot, 
+  addDoc, 
+  getDocFromServer, 
+  Timestamp,
+  serverTimestamp
+} from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase
@@ -74,12 +97,9 @@ async function testConnection() {
 testConnection();
 
 // Auth Functions
-export const loginWithGoogle = async () => {
+export const initializeUserProfile = async (user: FirebaseUser) => {
+  const path = `users/${user.uid}`;
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
-    
-    // Check if user exists in Firestore, if not create profile
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) {
       await setDoc(doc(db, 'users', user.uid), {
@@ -89,9 +109,39 @@ export const loginWithGoogle = async () => {
         createdAt: serverTimestamp()
       });
     }
-    return user;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+};
+
+export const loginWithGoogle = async () => {
+  // For mobile, redirect is often more reliable
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  
+  try {
+    if (isMobile) {
+      await signInWithRedirect(auth, googleProvider);
+    } else {
+      const result = await signInWithPopup(auth, googleProvider);
+      await initializeUserProfile(result.user);
+      return result.user;
+    }
   } catch (error) {
     console.error('Login error:', error);
+    throw error;
+  }
+};
+
+export const handleRedirectResult = async () => {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result) {
+      await initializeUserProfile(result.user);
+      return result.user;
+    }
+    return null;
+  } catch (error) {
+    console.error("Redirect login error:", error);
     throw error;
   }
 };
